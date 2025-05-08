@@ -1,5 +1,8 @@
-#[derive(Debug, Eq, PartialEq)]
+use crate::commands;
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum Token {
+    Command(commands::CommandType),
     Word(String),
     PreviousDir,
     Space,
@@ -39,9 +42,16 @@ impl<'s> Lexer<'s> {
 
         if self.check_multi_token("&&") {
             return Some(Token::And);
-        }
-        if self.check_multi_token("..") {
+        } else if self.check_multi_token("..") {
             return Some(Token::PreviousDir);
+        } else if self.check_multi_token("touch") {
+            return Some(Token::Command(commands::CommandType::Touch));
+        } else if self.check_multi_token("cd") {
+            return Some(Token::Command(commands::CommandType::Cd));
+        } else if self.check_multi_token("mv") {
+            return Some(Token::Command(commands::CommandType::Mv));
+        } else if self.check_multi_token("ls") {
+            return Some(Token::Command(commands::CommandType::Ls));
         }
 
         match self.input.chars().nth(self.cursor).unwrap() {
@@ -100,7 +110,7 @@ mod tests {
         let input = "touch folder1/folder2/file.png";
 
         let expected_tokens = vec![
-            Token::Word(String::from("touch")),
+            Token::Command(commands::CommandType::Touch),
             Token::Space,
             Token::Word(String::from("folder1")),
             Token::Slash,
@@ -122,7 +132,7 @@ mod tests {
         let input = "cd folder1/folder2";
 
         let expected_tokens = vec![
-            Token::Word(String::from("cd")),
+            Token::Command(commands::CommandType::Cd),
             Token::Space,
             Token::Word(String::from("folder1")),
             Token::Slash,
@@ -140,7 +150,7 @@ mod tests {
         let input = "cd ../folder1/folder2/file.png";
 
         let expected_tokens = vec![
-            Token::Word(String::from("cd")),
+            Token::Command(commands::CommandType::Cd),
             Token::Space,
             Token::PreviousDir,
             Token::Slash,
@@ -164,7 +174,7 @@ mod tests {
         let input = "cd folder1/folder2 && touch file.png";
 
         let expected_tokens = vec![
-            Token::Word(String::from("cd")),
+            Token::Command(commands::CommandType::Cd),
             Token::Space,
             Token::Word(String::from("folder1")),
             Token::Slash,
@@ -172,7 +182,7 @@ mod tests {
             Token::Space,
             Token::And,
             Token::Space,
-            Token::Word(String::from("touch")),
+            Token::Command(commands::CommandType::Touch),
             Token::Space,
             Token::Word(String::from("file")),
             Token::Dot,
@@ -190,7 +200,7 @@ mod tests {
         let input = "mv file1.png folder1/file1.png";
 
         let expected_tokens = vec![
-            Token::Word(String::from("mv")),
+            Token::Command(commands::CommandType::Mv),
             Token::Space,
             Token::Word(String::from("file1")),
             Token::Dot,

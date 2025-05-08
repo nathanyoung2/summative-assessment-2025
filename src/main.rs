@@ -1,3 +1,11 @@
+mod commands;
+
+mod tree;
+pub use tree::Context;
+
+mod parser;
+use parser::Parser;
+
 mod lexer;
 use lexer::Lexer;
 
@@ -15,8 +23,12 @@ fn get_user_input() -> Option<String> {
 fn main() {
     print!("/home/myuser/> ");
     let input = get_user_input();
+
     if let Some(input) = input {
-        let command_lexer = Lexer::new(&input);
-        println!("{:?}", command_lexer.tokenize());
+        let mut command_lexer = Lexer::new(&input);
+        let tokens = command_lexer.tokenize();
+
+        let mut parser = Parser::new(tokens);
+        let commands = parser.generate_commands();
     }
 }
