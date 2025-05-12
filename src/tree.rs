@@ -1,11 +1,13 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
+#[derive(Debug)]
 pub struct Context {
     root: Rc<Node>,
     current_dir: Rc<Node>,
 }
 
+#[derive(Debug)]
 pub enum Node {
     Root {
         children: RefCell<Vec<Rc<Node>>>,

@@ -1,6 +1,7 @@
 use crate::commands;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+/// Represents a token in the inputted command.
 pub enum Token {
     Command(commands::CommandType),
     Word(String),
@@ -24,7 +25,8 @@ impl<'s> Lexer<'s> {
     pub fn new(input: &'s str) -> Self {
         Self { input, cursor: 0 }
     }
-
+    
+    /// Converts `self.input` into a vector of meaningful tokens.
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut accumulator = Vec::new();
 
@@ -35,11 +37,13 @@ impl<'s> Lexer<'s> {
         accumulator
     }
 
+    /// Indentify the next token from the cursor
     fn read_next_token(&mut self) -> Option<Token> {
         if self.cursor == self.input.len() {
             return None;
         }
 
+        // check for tokens with more than 1 character.
         if self.check_multi_token("&&") {
             return Some(Token::And);
         } else if self.check_multi_token("..") {
@@ -54,6 +58,7 @@ impl<'s> Lexer<'s> {
             return Some(Token::Command(commands::CommandType::Ls));
         }
 
+        // check for tokens with 1 character.
         match self.input.chars().nth(self.cursor).unwrap() {
             '.' => {
                 self.cursor += 1;
@@ -67,6 +72,8 @@ impl<'s> Lexer<'s> {
                 self.cursor += 1;
                 Some(Token::Space)
             }
+            // any other token is treated as a `Word`
+            // the start of the next token needs to be indentified to tell how long the word is.
             _ => {
                 let next = self.next_token_index();
                 let word_contents = &self.input[self.cursor..next];
@@ -76,6 +83,7 @@ impl<'s> Lexer<'s> {
         }
     }
 
+    /// Check if the cursor is currently at a multi-character long token: `token`
     fn check_multi_token(&mut self, token: &str) -> bool {
         if self.cursor + token.len() > self.input.len() {
             return false;
@@ -89,6 +97,7 @@ impl<'s> Lexer<'s> {
         false
     }
 
+    /// Get the starting index of the next token that isn't a word.
     fn next_token_index(&self) -> usize {
         let chars = self.input[self.cursor..].chars();
         for (i, c) in chars.enumerate() {

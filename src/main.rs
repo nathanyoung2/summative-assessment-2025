@@ -11,6 +11,7 @@ use lexer::Lexer;
 
 use std::io::{Write, stdin, stdout};
 
+/// Helper function for reading a line of input.
 fn get_user_input() -> Option<String> {
     stdout().flush().ok()?;
 

@@ -1,19 +1,28 @@
 use crate::Context;
 use std::fmt::Debug;
+use crate::parser::{SyntaxError, NodePath, NodePathSegment};
 
-#[derive(Default, Debug)]
+const EXPECTED_ARG_COUNT: usize = 1;
+
+#[derive(Debug)]
 pub struct CdCmd {
-    ctx: String,
+    path: NodePath,
 }
 
 impl super::Command for CdCmd {
-    fn required_arg_count(&self) -> usize {
-        1
+    fn build(arguments: &[NodePath]) -> Result<Self, SyntaxError> {
+        if arguments.len() != EXPECTED_ARG_COUNT {
+            return Err(SyntaxError::InvalidArguments);
+        }
+
+        if let NodePathSegment::File(..) = arguments[0].last().unwrap() {
+            return Err(SyntaxError::InvalidType);
+        }
+        
+        Ok(Self {
+            path: arguments[0].clone(),
+        })
     }
 
-    fn execute(&self, ctx: &mut Context) {}
-}
-
-pub fn get() -> CdCmd {
-    CdCmd::default()
+    fn execute(&self, ctx: Context) {}
 }

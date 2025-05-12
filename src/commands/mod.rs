@@ -1,4 +1,5 @@
 use crate::Context;
+use crate::parser::{NodePath, NodePathSegment, SyntaxError};
 use std::fmt::Debug;
 mod cd_command;
 
@@ -10,14 +11,32 @@ pub enum CommandType {
     Touch,
 }
 
-pub trait Command : Debug {
-    fn required_arg_count(&self) -> usize;
-    fn execute(&self, ctx: &mut Context);
+pub struct CommandBuilder {
+    command_type: CommandType,
+    arguments: Vec<NodePath>,
 }
 
-pub fn get_command(command_type: CommandType) -> Option<Box<dyn Command>> {
-    match command_type {
-        CommandType::Cd => Some(Box::new(cd_command::get())),
-        _ => None,
+impl CommandBuilder {
+    pub fn new(command_type: CommandType) -> Self {
+        Self {
+            command_type,
+            arguments: Vec::new(),
+        }
     }
+
+    pub fn add_argument(&mut self, arg: NodePath) {
+        self.arguments.push(arg);
+    }
+
+    pub fn build(&self) -> Result<Box<dyn Command>, SyntaxError> {
+        match self.command_type {
+            CommandType::Cd => Ok(Box::new(cd_command::CdCmd::build(&self.arguments)?)),
+            _ => Ok(Box::new(cd_command::CdCmd::build(&self.arguments)?)),
+        }
+    }
+}
+
+pub trait Command : Debug {
+    fn build(arguments: &[NodePath]) -> Result<Self, SyntaxError> where Self: Sized;
+    fn execute(&self, ctx: Context);
 }
