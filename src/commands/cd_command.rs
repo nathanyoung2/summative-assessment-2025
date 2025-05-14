@@ -1,5 +1,6 @@
 use crate::Context;
 use std::fmt::Debug;
+use std::rc::Rc;
 use crate::parser::{SyntaxError, NodePath, NodePathSegment};
 
 const EXPECTED_ARG_COUNT: usize = 1;
@@ -15,7 +16,7 @@ impl super::Command for CdCmd {
             return Err(SyntaxError::InvalidArguments);
         }
 
-        if let NodePathSegment::File(..) = arguments[0].last().unwrap() {
+        if let NodePathSegment::File(..) | NodePathSegment::Root = arguments[0].last().unwrap() {
             return Err(SyntaxError::InvalidType);
         }
         
@@ -24,5 +25,10 @@ impl super::Command for CdCmd {
         })
     }
 
-    fn execute(&self, ctx: Context) {}
+    fn execute(&self, ctx: Rc<Context>) {
+        let target = ctx.node_from_path(&self.path);
+        if let Ok(target) = target {
+            ctx.set_current_dir(target);
+        }
+    }
 }

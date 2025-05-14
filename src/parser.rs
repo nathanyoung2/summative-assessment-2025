@@ -92,19 +92,19 @@ impl Parser {
 
             // after the final token, compile an argument if there is one and 
             // attempt to build the command
-            if self.cursor == self.tokens.len() {
+            if self.cursor == self.tokens.len() - 1 {
                 if let Some(arg_start) = self.arg_start {
-                    let arg = compile_argument(&self.tokens[arg_start..self.cursor])?;
+                    let arg = compile_argument(&self.tokens[arg_start..])?;
 
                     self.current_command.as_mut().map(|command| {
                         command.add_argument(arg);
                         command
                     });
                     self.arg_start = None;
+                }
 
-                    if let Some(command) = self.current_command.take() {
-                        commands.push(command.build()?);
-                    }
+                if let Some(command) = self.current_command.take() {
+                    commands.push(command.build()?);
                 }
             }
 
@@ -138,7 +138,7 @@ impl Parser {
                 }
             },
             Some(Token::Word(..)) => match self.tokens[self.cursor] {
-                Token::And | Token::Slash | Token::Dot => Ok(()),
+                Token::And | Token::Slash | Token::Dot | Token::Space => Ok(()),
                 _ => Err(SyntaxError::UnexpectedToken),
             },
             Some(Token::Command(..)) => match self.tokens[self.cursor] {
@@ -165,6 +165,7 @@ impl Parser {
 }
 
 #[derive(Debug, Clone)]
+/// Part of a NodePath
 pub enum NodePathSegment {
     Root,
     Dir(String),
@@ -174,9 +175,11 @@ pub enum NodePathSegment {
 
 pub type NodePath = Vec<NodePathSegment>;
 
+/// Helper function for converting an array of `Token`s into a `NodePath`.
+/// Returns a `SyntaxError` if the path is not valid.
 fn compile_argument(tokens: &[Token]) -> Result<NodePath, SyntaxError> {
     let mut path = Vec::new();
-    if let Token::Slash = tokens[0] {
+    if let Some(Token::Slash) = tokens.get(0) {
         path.push(NodePathSegment::Root);
     }
 

@@ -1,7 +1,9 @@
 use crate::Context;
-use crate::parser::{NodePath, NodePathSegment, SyntaxError};
+use crate::parser::{NodePath, SyntaxError};
 use std::fmt::Debug;
+use std::rc::Rc;
 mod cd_command;
+mod ls_command;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum CommandType {
@@ -31,6 +33,7 @@ impl CommandBuilder {
     pub fn build(&self) -> Result<Box<dyn Command>, SyntaxError> {
         match self.command_type {
             CommandType::Cd => Ok(Box::new(cd_command::CdCmd::build(&self.arguments)?)),
+            CommandType::Ls => Ok(Box::new(ls_command::LsCmd::build(&self.arguments)?)),
             _ => Ok(Box::new(cd_command::CdCmd::build(&self.arguments)?)),
         }
     }
@@ -38,5 +41,5 @@ impl CommandBuilder {
 
 pub trait Command : Debug {
     fn build(arguments: &[NodePath]) -> Result<Self, SyntaxError> where Self: Sized;
-    fn execute(&self, ctx: Context);
+    fn execute(&self, ctx: Rc<Context>);
 }
