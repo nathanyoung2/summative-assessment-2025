@@ -68,6 +68,11 @@ impl super::Command for TouchCmd {
             println!("Cannot create a file with 0 size");
             return;
         }
+        
+        if self.file_name.split(".").last().unwrap().len() != 3 {
+            println!("File extension must be 3 characters because Doc said so.");
+            return;
+        }
 
         // create the new file in target.
         if let Ok(target) = ctx.node_from_path(&self.path) {
