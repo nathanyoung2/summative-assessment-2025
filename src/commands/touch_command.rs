@@ -36,7 +36,8 @@ impl super::Command for TouchCmd {
         // check that the second argument is a size, set size to 1 if not supplied
         let size = match arguments.get(1) {
             Some(Argument::Number(n)) => *n,
-            _ => 1,
+            Some(_) => return Err(SyntaxError::InvalidType),
+            None => 1,
         };
 
         Ok(Self {
