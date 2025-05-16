@@ -6,12 +6,15 @@ use crate::parser::{NodePath, NodePathSegment};
 
 
 #[derive(Debug, Clone)]
+/// The holds important references to nodes on the tree
+/// And contains methods for tree manipulation.
 pub struct Context {
     root: RefCell<Rc<Node>>,
     current_dir: RefCell<Rc<Node>>,
 }
 
 impl Context {
+    /// Create a new context.
     pub fn new(root: Rc<Node>, current_dir: Rc<Node>) -> Self {
         Self {
             root: RefCell::new(root),
@@ -24,6 +27,7 @@ impl Context {
         &self.current_dir
     }
 
+    /// Set the curent directory to `new_dir`
     pub fn set_current_dir(&self, new_dir: Rc<Node>) {
         *self.current_dir.borrow_mut() = new_dir;
     }
@@ -85,20 +89,38 @@ impl Context {
 pub struct InvalidFolder;
 
 #[derive(Debug)]
+/// Represents a node in the file tree, could be the root, a folder, or a file.
 pub enum Node {
+    /// Root is not accessable by the user, but it only contains children.
     Root {
         children: RefCell<Vec<Rc<Node>>>,
     },
+    /// A folder with a parent and children containing more nodes.
     Folder {
+        /// Folder name
         name: RefCell<String>,
+
+        /// size in kilobytes of the folder (sum of the sizes of its children)
         size: RefCell<usize>,
+        
         parent: RefCell<Weak<Node>>,
         children: RefCell<Vec<Rc<Node>>>,
+
+        /// Depth represents the depth into the heirarchy where the root has a depth of 0
+        depth: RefCell<usize>,
     },
+    /// A file has no children
     File {
+        /// File name
         name: RefCell<String>,
+
+        /// Size of the file (in kilobytes)
         size: RefCell<usize>,
+
         parent: RefCell<Weak<Node>>,
+
+        /// Depth represents the depth into the heirarchy where the root has a depth of 0
+        depth: RefCell<usize>,
     },
 }
 
@@ -113,29 +135,35 @@ impl fmt::Display for Node {
 }
 
 impl Node {
+    /// Create a new root node
     pub fn new_root() -> Self {
         Self::Root {
             children: RefCell::new(Vec::new()),
         }
     }
 
+    /// Create a new folder with the name, `name`
     pub fn new_folder(name: &str) -> Self {
         Self::Folder {
             name: RefCell::new(name.to_string()),
             size: RefCell::new(0),
             parent: RefCell::new(Weak::new()),
             children: RefCell::new(Vec::new()),
+            depth: RefCell::new(0),
         }
     }
 
+    /// Create a new file of size: `size` with name: `name`
     pub fn new_file(name: &str, size: usize) -> Self {
         Self::File {
             name: RefCell::new(name.to_string()),
             size: RefCell::new(size),
             parent: RefCell::new(Weak::new()),
+            depth: RefCell::new(0),
         }
     }
 
+    /// Get a reference to the node's parent, if it has one
     pub fn parent(&self) -> Option<&RefCell<Weak<Node>>> {
         match &*self {
             Node::Folder { parent, .. } => Some(parent),
@@ -144,6 +172,7 @@ impl Node {
         }
     }
 
+    /// Get a reference to the node's children, if it has them
     pub fn children(&self) -> Option<&RefCell<Vec<Rc<Node>>>> {
         match &*self {
             Node::Folder { children, .. } => Some(children),
@@ -152,6 +181,7 @@ impl Node {
         }
     }
 
+    /// Get the node's size
     pub fn size(&self) -> Option<usize> {
         match self {
             Node::Folder { size, .. } => Some(*size.borrow()),
@@ -160,6 +190,7 @@ impl Node {
         }
     }
 
+    /// Get the node's name
     pub fn name(&self) -> Option<String> {
         match self {
             Node::Folder { name, .. } => Some(name.borrow().clone()),
@@ -167,12 +198,32 @@ impl Node {
             Node::Root { .. } => None,
         }
     }
+    
+    /// Get the depth of the node
+    pub fn depth(&self) -> usize {
+        match self {
+            Node::Folder { depth, .. } => depth.borrow().clone(),
+            Node::File { depth, .. } => depth.borrow().clone(),
+            Node::Root { .. } => 0,
+        }
+    }
 
+    /// Get a reference to the node's depth.
+    pub fn depth_ref(&self) -> Option<&RefCell<usize>> {
+        match self {
+            Node::Folder { depth, .. } => Some(depth),
+            Node::File { depth, .. } => Some(depth),
+            Node::Root { .. } => None,
+        }
+    }
+
+    /// Add the node: `child` to this node.
     pub fn add(self: Rc<Self>, child: Rc<Self>) -> Result<(), NodeTypeError> {
         let add_child_to_children =
             |children: &RefCell<Vec<Rc<Self>>>,
             file_size: Option<&RefCell<usize>>| -> Result<(), NodeTypeError> {
                 *child.parent().ok_or(NodeTypeError)?.borrow_mut() = Rc::downgrade(&self);
+                *child.depth_ref().ok_or(NodeTypeError)?.borrow_mut() = self.depth() + 1;
                 children.borrow_mut().push(Rc::clone(&child));
 
                 if let Some(size) = file_size {
@@ -188,6 +239,22 @@ impl Node {
             Node::File { .. } => return Err(NodeTypeError),
         }
 
+        Ok(())
+    }
+
+    /// Remove a node by name from this node.
+    pub fn remove(self: Rc<Self>, node_name: &str) -> Result<(), String> {
+        let get_index = || {
+            for (i, node) in self.children().unwrap().borrow().iter().enumerate() {
+                if &node.name().unwrap() == node_name {
+                    return Ok(i);
+                }
+            }
+            return Err(format!["Could not locate item: {}", node_name]);
+        };
+
+        let index = get_index()?;
+        self.children().unwrap().borrow_mut().swap_remove(index);
         Ok(())
     }
 }
@@ -260,15 +327,15 @@ mod tests {
 
     #[test]
     fn navigate_valid() {
-        let mut ctx = build_tree("test_user");
-        let result = ctx.node_from_path(vec![NodePathSegment::Dir("documents".to_string())]);
+        let ctx = build_tree("test_user");
+        let result = ctx.node_from_path(&vec![NodePathSegment::Dir("documents".to_string())]);
         assert!(result.is_ok());
     }
     
     #[test]
     fn navigate_invalid() {
-        let mut ctx = build_tree("test_user");
-        let result = ctx.node_from_path(vec![NodePathSegment::Dir("abcdefg".to_string())]);
+        let ctx = build_tree("test_user");
+        let result = ctx.node_from_path(&vec![NodePathSegment::Dir("abcdefg".to_string())]);
         assert!(result.is_err());
     }
 }

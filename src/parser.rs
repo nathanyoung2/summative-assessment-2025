@@ -80,6 +80,9 @@ impl Parser {
                         self.arg_start = None;
                     }
                 }
+                Token::UnexpectedToken(token) => {
+                    println!("Unexpected Token '{}'", token);
+                }
                 _ => {
                     // in the case where there are no tokens that perform
                     // operations themselves, set the current cursor position as the
@@ -153,6 +156,11 @@ impl Parser {
                 Token::Command(..) | Token::Space => Ok(()),
                 _ => Err(SyntaxError::UnexpectedToken),
             },
+            Some(Token::Number(..)) => match self.tokens[self.cursor] {
+                Token::Space => Ok(()),
+                _ => Err(SyntaxError::UnexpectedToken),
+            }
+            Some(Token::UnexpectedToken(..)) => Ok(()),
             None => {
                 if let Token::Command(..) = self.tokens[self.cursor] {
                     Ok(())
@@ -162,6 +170,12 @@ impl Parser {
             },
         }
     }
+}
+
+#[derive(Debug)]
+pub enum Argument {
+    Path(NodePath),
+    Number(usize),
 }
 
 #[derive(Debug, Clone)]
@@ -177,7 +191,22 @@ pub type NodePath = Vec<NodePathSegment>;
 
 /// Helper function for converting an array of `Token`s into a `NodePath`.
 /// Returns a `SyntaxError` if the path is not valid.
-fn compile_argument(tokens: &[Token]) -> Result<NodePath, SyntaxError> {
+fn compile_argument(tokens: &[Token]) -> Result<Argument, SyntaxError> {
+    match tokens.get(0) {
+        Some(Token::Word { .. }) | Some(Token::Slash) 
+        | Some(Token::PreviousDir) => {
+            return compile_path(tokens).map(|path| Argument::Path(path));
+        },
+        Some(Token::Number(n)) => {
+            return Ok(Argument::Number(*n));
+        }
+        _ => {
+            return Err(SyntaxError::UnexpectedToken);
+        }
+    }
+}
+
+fn compile_path(tokens: &[Token]) -> Result<NodePath, SyntaxError> {
     let mut path = Vec::new();
     if let Some(Token::Slash) = tokens.get(0) {
         path.push(NodePathSegment::Root);
@@ -223,6 +252,8 @@ mod tests {
 
         let mut parser = Parser::new(tokens);
         let commands = parser.generate_commands();
+
+        assert!(commands.is_ok());
     }
 
     #[test]

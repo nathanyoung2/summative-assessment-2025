@@ -22,6 +22,7 @@ fn get_user_input() -> Option<String> {
     Some(buffer)
 }
 
+/// Helper function to print error messages if a command cannot be built.
 fn handle_err(e: SyntaxError) {
     match e {
         SyntaxError::CommandNotProvided => {
@@ -46,6 +47,7 @@ fn handle_err(e: SyntaxError) {
 }
 
 fn main() {
+    // create the main context
     let ctx = Rc::new(tree::build_tree("user1"));
 
     loop {
@@ -53,12 +55,15 @@ fn main() {
         let input = get_user_input();
 
         if let Some(input) = input {
+            // create a lexer and tokenize the input string
             let mut command_lexer = Lexer::new(&input.trim());
             let tokens = command_lexer.tokenize();
 
+            // pass the token array from the lexer to the parser to generate the commands
             let mut parser = Parser::new(tokens);
             let commands = parser.generate_commands();
 
+            // execute the commands if they are valid.
             match commands {
                 Ok(commands) => {
                     for command in commands.iter() {

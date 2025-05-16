@@ -10,12 +10,17 @@ pub enum Token {
     Dot,
     Slash,
     And,
+    Number(usize),
+    UnexpectedToken(char),
 }
 
 /// A `Lexer` is responsible for turning the raw input command from the user into a vector of
 /// tokens that can be interpereted at a later stage.
 pub struct Lexer<'s> {
+    /// Input string
     input: &'s str,
+
+    /// Current character position in the input string.
     cursor: usize,
 }
 
@@ -52,10 +57,14 @@ impl<'s> Lexer<'s> {
             return Some(Token::Command(commands::CommandType::Touch));
         } else if self.check_multi_token("cd") {
             return Some(Token::Command(commands::CommandType::Cd));
-        } else if self.check_multi_token("mv") {
-            return Some(Token::Command(commands::CommandType::Mv));
         } else if self.check_multi_token("ls") {
             return Some(Token::Command(commands::CommandType::Ls));
+        } else if self.check_multi_token("mkdir") {
+            return Some(Token::Command(commands::CommandType::Mkdir));
+        } else if self.check_multi_token("rmdir") {
+            return Some(Token::Command(commands::CommandType::Rmdir));
+        } else if self.check_multi_token("rm") {
+            return Some(Token::Command(commands::CommandType::Rm));
         }
 
         // check for tokens with 1 character.
@@ -72,15 +81,64 @@ impl<'s> Lexer<'s> {
                 self.cursor += 1;
                 Some(Token::Space)
             }
+            '\"' => {
+                self.cursor += 1;
+                let word = self.get_in_quotes();
+                Some(Token::Word(word))
+            }
+            '0'..='9' => {
+                let n = self.get_number_token();
+                Some(Token::Number(n))
+            }
+            
             // any other token is treated as a `Word`
             // the start of the next token needs to be indentified to tell how long the word is.
             _ => {
-                let next = self.next_token_index();
-                let word_contents = &self.input[self.cursor..next];
-                self.cursor = next;
-                return Some(Token::Word(word_contents.to_string()));
+                let current_char = self.input.chars().nth(self.cursor).unwrap();
+                if current_char.is_alphabetic() {
+                    let next = self.next_token_index();
+                    let word_contents = &self.input[self.cursor..next];
+                    self.cursor = next;
+                    return Some(Token::Word(word_contents.to_string()));
+                } else {
+                    self.cursor += 1;
+                    return Some(Token::UnexpectedToken(current_char))
+                }
             }
         }
+    }
+
+    /// Get the full string within quotes. This assumes the cursor
+    /// Is currently 1 character after a quote.
+    fn get_in_quotes(&mut self) -> String {
+        let mut acc = String::new();
+
+        while let Some(ch) = self.input.chars().nth(self.cursor) {
+            if ch != '\"' {
+                acc.push(ch);
+            } else {
+                self.cursor += 1;
+                break;
+            }
+
+            self.cursor += 1
+        }
+
+        acc
+    }
+
+    /// Get a full number, assuming the cursor is currently over the beginning of the number.
+    fn get_number_token(&mut self) -> usize {
+        let mut acc = String::new();
+        while let Some(ch) = self.input.chars().nth(self.cursor) {
+            if ch.is_ascii_digit() {
+                acc.push(ch);
+            } else {
+                break;
+            }
+            self.cursor += 1;
+        }
+        acc.parse::<usize>().unwrap()
     }
 
     /// Check if the cursor is currently at a multi-character long token: `token`
@@ -206,10 +264,10 @@ mod tests {
 
     #[test]
     fn tokenize_two_arguments() {
-        let input = "mv file1.png folder1/file1.png";
+        let input = "rm file1.png folder1/file1.png";
 
         let expected_tokens = vec![
-            Token::Command(commands::CommandType::Mv),
+            Token::Command(commands::CommandType::Rm),
             Token::Space,
             Token::Word(String::from("file1")),
             Token::Dot,
@@ -220,6 +278,58 @@ mod tests {
             Token::Word(String::from("file1")),
             Token::Dot,
             Token::Word(String::from("png")),
+        ];
+
+        let mut command_lexer = Lexer::new(input);
+        let tokens = command_lexer.tokenize();
+
+        assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
+    fn tokenize_number() {
+        let input = "touch file.png 232";
+
+        let expected_tokens = vec![
+            Token::Command(commands::CommandType::Touch),
+            Token::Space,
+            Token::Word(String::from("file")),
+            Token::Dot,
+            Token::Word(String::from("png")),
+            Token::Space,
+            Token::Number(232),
+        ];
+
+        let mut command_lexer = Lexer::new(input);
+        let tokens = command_lexer.tokenize();
+
+        assert_eq!(tokens, expected_tokens);
+    }
+
+    #[test]
+    fn tokenize_with_quote() {
+        let input = "mkdir \"this is a folder\"";
+        
+        let expected_tokens = vec![
+            Token::Command(commands::CommandType::Mkdir),
+            Token::Space,
+            Token::Word(String::from("this is a folder")),
+        ];
+
+        let mut command_lexer = Lexer::new(input);
+        let tokens = command_lexer.tokenize();
+
+        assert_eq!(tokens, expected_tokens);
+    }
+    
+    #[test]
+    fn tokenize_unclosed_quote() {
+        let input = "mkdir \"this is a folder";
+
+        let expected_tokens = vec![
+            Token::Command(commands::CommandType::Mkdir),
+            Token::Space,
+            Token::Word(String::from("this is a folder")),
         ];
 
         let mut command_lexer = Lexer::new(input);
